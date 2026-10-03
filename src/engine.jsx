@@ -419,6 +419,41 @@ export async function startEngine() {
   }
   const casebox = buildCase(); casebox.position.set(22,0,-9); casebox.rotation.y=-.42; scene.add(casebox);
 
+  /* gift box: only shown when the page was opened from a share link */
+  const GIFT = { W:13, D:9, H:4.6 };
+  function buildGift(){
+    const g=new THREE.Group(), { W, D, H }=GIFT, t=.22;
+    const [c,gg]=makeCanvas(256,256); gg.fillStyle='#c79a5e'; gg.fillRect(0,0,256,256);
+    speckle(gg,256,256,2400,'90,55,25',.18,11); speckle(gg,256,256,600,'255,235,200',.12,12);
+    const kraft=new THREE.MeshStandardMaterial({ map:toTex(c), roughness:.92, transparent:true });
+    const inside=new THREE.MeshStandardMaterial({ color:'#a77b45', roughness:1, transparent:true });
+    const ribbon=new THREE.MeshStandardMaterial({ color:'#a8483e', roughness:.45, metalness:.05, transparent:true });
+    const mats=[kraft,inside,ribbon];
+    const box=(w,h,d,x,y,z,m,p)=>{ const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); b.position.set(x,y,z); b.castShadow=b.receiveShadow=true; p.add(b); return b; };
+    const base=new THREE.Group(); g.add(base);
+    box(W,t,D,0,t/2,0,inside,base);
+    box(W,H,t,0,H/2,D/2,kraft,base); box(W,H,t,0,H/2,-D/2,kraft,base);
+    box(t,H,D,W/2,H/2,0,kraft,base); box(t,H,D,-W/2,H/2,0,kraft,base);
+    box(1.2,H,.06,0,H/2,D/2+.14,ribbon,base); box(1.2,H,.06,0,H/2,-D/2-.14,ribbon,base);
+    box(.06,H,1.2,W/2+.14,H/2,0,ribbon,base); box(.06,H,1.2,-W/2-.14,H/2,0,ribbon,base);
+    const lid=new THREE.Group(); lid.position.y=H; g.add(lid);
+    const LW=W+.5, LD=D+.5, LH=1.4;
+    box(LW,t,LD,0,.12,0,kraft,lid);
+    box(LW,LH,t,0,-LH/2+.2,LD/2,kraft,lid); box(LW,LH,t,0,-LH/2+.2,-LD/2,kraft,lid);
+    box(t,LH,LD,LW/2,-LH/2+.2,0,kraft,lid); box(t,LH,LD,-LW/2,-LH/2+.2,0,kraft,lid);
+    box(1.2,.06,LD+.1,0,.26,0,ribbon,lid); box(LW+.1,.06,1.2,0,.26,0,ribbon,lid);
+    box(1.2,LH,.06,0,-LH/2+.2,LD/2+.13,ribbon,lid); box(.06,LH,1.2,LW/2+.13,-LH/2+.2,0,ribbon,lid);
+    box(.06,LH,1.2,-LW/2-.13,-LH/2+.2,0,ribbon,lid); box(1.2,LH,.06,0,-LH/2+.2,-LD/2-.13,ribbon,lid);
+    for(const s of [-1,1]){ const loop=new THREE.Mesh(new THREE.TorusGeometry(1.15,.32,10,28),ribbon);
+      loop.position.set(s*1.1,1.1,0); loop.rotation.set(0,s*.35,s*.5); loop.scale.set(1,.85,.6); loop.castShadow=true; lid.add(loop); }
+    const knot=new THREE.Mesh(new THREE.SphereGeometry(.55,16,12),ribbon); knot.position.y=.5; knot.scale.set(1,.7,1); lid.add(knot);
+    for(const s of [-1,1]){ const tail=box(.9,.05,2.6,s*.7,.3,1.5,ribbon,lid); tail.rotation.y=s*.4; }
+    const shadow=blob(W*1.5,D*1.6,.5); g.add(shadow);
+    return { group:g, base, lid, mats, shadow };
+  }
+  const gift = buildGift(); gift.group.visible=false; scene.add(gift.group);
+  const GIFT_POS = V(6,0,3);
+
   function notebookCanvas(){
     const [c,g]=makeCanvas(1024,1448); g.fillStyle='#f1eadb'; g.fillRect(0,0,1024,1448); speckle(g,1024,1448,4000,'120,100,70',.06,2);
     g.strokeStyle='rgba(80,110,170,.45)'; g.lineWidth=2; for(let y=150;y<1448;y+=46){ g.beginPath(); g.moveTo(0,y); g.lineTo(1024,y); g.stroke(); }
@@ -594,6 +629,7 @@ export async function startEngine() {
     closeup: { pos:[7.5,27,27], look:[7.2,0,7.5], k:.6 },
     rewind:  { pos:[7.5,26,17], look:[7.2,0,4.6], k:.5 },
     finished:{ pos:[1,35,38],   look:[1,0,2],    k:.75 },
+    gift:    { pos:[6,24,30],   look:[6,2.5,3],  k:.6 },
   };
   const cam = { pos:V(), look:V(), view:'intro', moving:false };
   const fovFor = () => { const a=innerWidth/innerHeight; return a<.8 ? 52 : a<1.2 ? 42 : 34; };
@@ -698,7 +734,7 @@ export async function startEngine() {
       const demo=S.rec?.demo;
       if(S.hasPlayed){ setInstr('Mau iseng sedikit? Keluarkan kasetnya.'); hs=()=>keyWorld('stop'); }
       else { setInstr(demo?'Ini rekaman contoh (demo), bukan suaramu. Tekan ▶ untuk mendengarkan.':'Tekan ▶ untuk mendengarkan suaramu.'); hs=()=>keyWorld('play'); }
-      setControls([{label:'▶ Putar',primary:!S.hasPlayed,onClick:()=>pressAction('play')},{label:'⏏ Keluarkan kaset',primary:S.hasPlayed,onClick:()=>eject()},{label:'✉ Kirim ke teman',onClick:openShare},{label:'● Rekam ulang',onClick:()=>pressAction('rec')}]);
+      setControls(demo?[]:[{label:'✉ Kirim ke teman',primary:true,onClick:openShare}]);
     }
     else if(st==='playing'){
       setInstr(S.paused?'Dijeda.':(S.rec?.demo?'Memutar rekaman contoh (demo)…':'Mendengarkan…'));
@@ -707,7 +743,8 @@ export async function startEngine() {
     else if(st==='ejected' || st==='pulling'){ setInstr('Tarik pitanya. Pelan-pelan.'); setControls(st==='ejected'?[{label:'Kembalikan ke recorder',onClick:()=>replay(false)}]:[]); if(st==='ejected') hs=tapeMidWorld; }
     else if(st==='tangled'){ setInstr('Masukkan pensil ke lubang kaset.'); setControls([{label:'✎ Pasang pensil',primary:true,onClick:()=>insertPencil()}]); hs=pencilMid; }
     else if(st==='rewinding'){ setInstr('Putar pensilnya. Gulung kembali.'); setControls([{label:'Tahan untuk menggulung',hold:true}]); }
-    else if(st==='restored'){ setInstr('Sudah rapi. Putar lagi?'); setControls([{label:'▶ Dengarkan lagi',primary:true,onClick:()=>replay(true)},{label:'✉ Kirim ke teman',onClick:openShare},{label:'⤓ Simpan rekaman',onClick:download},{label:'● Rekam ulang',onClick:()=>pressAction('rec')}]); }
+    else if(st==='restored'){ setInstr('Sudah rapi. Putar lagi?'); setControls([{label:'▶ Dengarkan lagi',primary:true,onClick:()=>replay(true)},{label:'✉ Kirim ke teman',onClick:openShare},{label:'⤓ Simpan rekaman',onClick:download}]); }
+    else if(st==='gift'){ setInstr(''); setControls([]); }
     else setControls([]);
     S.hot=hs; ui.hot.hidden=!hs;
   }
@@ -725,13 +762,9 @@ export async function startEngine() {
   /* title editor */
   const titleBox=$('#titleBox'), titleInput=$('#titleInput');
   function openTitle(){ titleInput.value=S.title; titleBox.hidden=false; setTimeout(()=>titleInput.focus(),30); }
-  $('#btnTitle').onclick=openTitle;
   $('#titleCancel').onclick=()=>{ titleBox.hidden=true; };
   titleBox.addEventListener('keydown',e=>{ if(e.key==='Escape') titleBox.hidden=true; });
   $('#titleForm').onsubmit=e=>{ e.preventDefault(); S.title=titleInput.value.trim().slice(0,24); drawLabel(); titleBox.hidden=true; if(S.title) toast('Tertulis di label.',1500); };
-  const bSfx=$('#btnSfx'), bFx=$('#btnFx');
-  bSfx.onclick=()=>{ S.sfx=!S.sfx; bSfx.setAttribute('aria-pressed',S.sfx); bSfx.textContent='Bunyi tombol: '+(S.sfx?'nyala':'mati'); };
-  bFx.onclick=()=>{ S.fx=!S.fx; bFx.setAttribute('aria-pressed',S.fx); bFx.textContent='Efek kaset: '+(S.fx?'nyala':'mati'); applyFx(); };
 
   /* ───────────────────────── mechanics ───────────────────────── */
   function setKey(a,down){ rec3d.keys[a].userData.pressed=down; }
@@ -924,14 +957,16 @@ export async function startEngine() {
   const shareBox=$('#shareBox'), shareForm=$('#shareForm'), shareDone=$('#shareDone'), shareLink=$('#shareLink');
   function openShare(){
     if(!S.rec) return;
+    $('#shareTitle').value=S.title;
     shareForm.hidden=false; shareDone.hidden=true; shareBox.hidden=false;
-    setTimeout(()=>$('#shareFrom').focus(),30);
+    setTimeout(()=>$('#shareTo').focus(),30);
   }
   const closeShare=()=>{ shareBox.hidden=true; };
   $('#shareCancel').onclick=closeShare; $('#shareClose').onclick=closeShare;
   shareBox.addEventListener('keydown',e=>{ if(e.key==='Escape') closeShare(); });
   shareForm.onsubmit=async e=>{
     e.preventDefault(); if(!S.rec) return;
+    const t=$('#shareTitle').value.trim().slice(0,24); if(t!==S.title){ S.title=t; drawLabel(); }
     const meta={ t:S.title, f:$('#shareFrom').value.trim().slice(0,24), to:$('#shareTo').value.trim().slice(0,24),
       m:$('#shareMsg').value.trim().slice(0,140), mime:S.rec.mime, d:Math.round(S.rec.duration||0) };
     const url=location.origin+location.pathname+SHARE_KEY+await encodeGift(meta,S.rec.blob);
@@ -950,27 +985,50 @@ export async function startEngine() {
     try{ await navigator.share({ title:'Putar Lagi', text:to?`Ada kaset untuk ${to}.`:'Ada kaset untukmu.', url:shareLink.value }); }catch{}
   };
 
-  async function checkGift(){
-    if(!location.hash.startsWith(SHARE_KEY)) return;
-    let gift;
-    try{ gift=decodeGift(location.hash.slice(SHARE_KEY.length)); }
-    catch(err){ console.warn(err); toast('Tautan kasetnya rusak.'); return; }
-    const { meta }=gift, box=$('#gift');
+  let pendingGift=null;
+  function loadGift(){
+    if(!location.hash.startsWith(SHARE_KEY)) return false;
+    try{ pendingGift=decodeGift(location.hash.slice(SHARE_KEY.length)); }
+    catch(err){ console.warn(err); toast('Tautan kasetnya rusak.'); return false; }
+    const { meta }=pendingGift, card=$('#gift');
     $('#giftTitle').textContent=meta.to?`Untuk ${meta.to}`:'Ada kaset untukmu';
     $('#giftFrom').textContent=meta.f?`dari ${meta.f}`:'';
     $('#giftMsg').textContent=meta.m||''; $('#giftMsg').hidden=!meta.m;
-    box.hidden=false; $('#giftOpen').focus();
-    $('#giftOpen').onclick=async()=>{
-      ensureCtx();
-      box.classList.add('opening'); sfx('click');
-      await new Promise(r=>setTimeout(r,reduceMotion?0:900));
-      box.hidden=true; box.classList.remove('opening');
-      if(S.rec) URL.revokeObjectURL(S.rec.url);
-      S.title=meta.t||''; S.rec={ blob:gift.blob, url:URL.createObjectURL(gift.blob), mime:gift.blob.type, ext:extFor(gift.blob.type), duration:meta.d||0, demo:false };
-      audioEl.src=S.rec.url; audioEl.load(); drawLabel();
-      S.busy=true; tapeReset(); await insertCassette(); S.busy=false;
-      S.hasPlayed=false; S.state='recorded'; renderUI(); S.forceRestart=true; play();
-    };
+    S.title=meta.t||''; drawLabel();
+    // cassette waits inside the box
+    gift.group.position.copy(GIFT_POS); gift.group.visible=true;
+    cassette.position.copy(GIFT_POS).setY(.3); cassette.rotation.set(0,0,0);
+    card.hidden=false; $('#giftOpen').onclick=openGift;
+    S.state='gift';
+    return true;
+  }
+  async function openGift(){
+    if(!pendingGift || S.busy || S.state!=='gift') return;
+    const { meta, blob }=pendingGift; pendingGift=null;
+    ensureCtx(); S.busy=true;
+    $('#gift').classList.add('gone'); setTimeout(()=>{ $('#gift').hidden=true; },400);
+    if(S.rec) URL.revokeObjectURL(S.rec.url);
+    S.rec={ blob, url:URL.createObjectURL(blob), mime:blob.type, ext:extFor(blob.type), duration:meta.d||0, demo:false };
+    audioEl.src=S.rec.url; audioEl.load();
+    const g=gift.group, lid=gift.lid, H=GIFT.H;
+    // a little shake before the lid gives
+    await tween(.55*M,k=>{ const a=Math.sin(k*Math.PI*6)*(1-k); g.rotation.z=a*.05; g.rotation.x=a*.03; g.position.y=Math.abs(a)*.25; },t=>t);
+    g.rotation.set(0,0,0); g.position.y=0;
+    sfx('click');
+    // lid pops up, tumbles and lands beside the box
+    const l0=lid.position.clone(), up=V(2.5,H+6,-1), land=V(11.5,1.2-g.position.y,3.5);
+    await tween(.45*M,k=>{ lid.position.lerpVectors(l0,up,k); lid.rotation.set(-.35*k,0,.25*k); },easeOut);
+    await tween(.6*M,k=>{ lid.position.lerpVectors(up,land,k); lid.position.y=lerp(up.y,land.y,easeIn(k)); lid.rotation.set(lerp(-.35,0,k),.5*k,lerp(.25,0,k)); },t=>t);
+    lid.position.copy(land); sfx('clunk');
+    // cassette rises out of the box and hovers for a beat
+    const c0=cassette.position.clone(), c1=c0.clone().setY(H+4.5);
+    await tween(.9*M,k=>{ cassette.position.lerpVectors(c0,c1,k); cassette.rotation.y=Math.sin(k*Math.PI)*.35; cassette.rotation.x=-.25*k; },easeOut);
+    await tween(.5*M,k=>{ cassette.position.y=c1.y+Math.sin(k*Math.PI)*.4; cassette.rotation.x=lerp(-.25,0,k); });
+    // box fades away while the tape drops into the recorder
+    const fade=tween(1.2*M,k=>{ gift.mats.forEach(m=>m.opacity=1-k); gift.shadow.material.opacity=.5*(1-k); });
+    tapeReset(); await insertCassette(); await fade;
+    gift.group.visible=false;
+    S.busy=false; S.hasPlayed=false; S.state='recorded'; renderUI(); S.forceRestart=true; play();
   }
 
   async function insertPencil(){
@@ -1028,6 +1086,7 @@ export async function startEngine() {
   canvas.addEventListener('pointerdown',e=>{
     if(drag || S.busy || !$('#modal').hidden) return;
     ensureCtx(); setRay(e); const st=S.state;
+    if(st==='gift'){ if(ray.intersectObject(gift.group,true).length) openGift(); return; }
     if(st==='tangled' && hitPencil()){
       drag={ type:'pencil', id:e.pointerId }; capture(e.pointerId); canvas.style.cursor='grabbing'; ui.hot.hidden=true; sfx('click'); return;
     }
@@ -1086,7 +1145,8 @@ export async function startEngine() {
     if(e.pointerType!=='mouse' || S.busy){ ui.tip.hidden=true; canvas.style.cursor=''; return; }
     let label=null, cur='';
     const st=S.state;
-    if(st==='rewinding'){ label='Putar melingkar searah jarum jam'; cur='grab'; }
+    if(st==='gift' && ray.intersectObject(gift.group,true).length){ label='Buka kotak'; cur='pointer'; }
+    else if(st==='rewinding'){ label='Putar melingkar searah jarum jam'; cur='grab'; }
     else if(st==='tangled' && hitPencil()){ label='Seret pensil ke lubang kaset'; cur='grab'; }
     else if((st==='ejected'||st==='pulling'||st==='tangled') && pickTape(e)>0){ label='Tarik pita'; cur='grab'; }
     else { const k=hitKey(); if(k){ label=KEY_NAMES[k]; cur='pointer'; } else if(hitLabel() && ['idle','recorded','restored','ejected'].includes(st)){ label='Tulis judul di label'; cur='text'; } }
@@ -1186,7 +1246,8 @@ export async function startEngine() {
   applyFov();
   requestAnimationFrame(frame);
   $('#loading').classList.add('gone'); setTimeout(()=>$('#loading').remove(),700);
-  S.state='idle'; renderUI();
-  goView('intro',2.2);
-  checkGift();
+  S.state='idle';
+  const isGift=loadGift();
+  renderUI();
+  goView(isGift?'gift':'intro',2.2);
 }

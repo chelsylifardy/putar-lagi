@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { startEngine } from './engine.jsx';
-import { Brand, Tools, Status, BottomBar, Feedback, Modal, TitleEditor, ShareBox, GiftBox } from './components/Overlay.jsx';
+import { Brand, Status, BottomBar, Feedback, Modal, TitleEditor, ShareBox, GiftBox } from './components/Overlay.jsx';
 
 export default function App() {
   useEffect(() => { startEngine(); }, []);
@@ -10,7 +10,6 @@ export default function App() {
       <div className="vignette"></div>
       <div className="grain"></div>
       <Brand />
-      <Tools />
       <Status />
       <BottomBar />
       <Feedback />

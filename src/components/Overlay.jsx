@@ -8,16 +8,6 @@ export function Brand() {
   );
 }
 
-export function Tools() {
-  return (
-    <div id="tools">
-      <button className="chip" id="btnTitle">✎ Judul kaset</button>
-      <button className="chip" id="btnSfx" aria-pressed="true">Bunyi tombol: nyala</button>
-      <button className="chip" id="btnFx" aria-pressed="true">Efek kaset: nyala</button>
-    </div>
-  );
-}
-
 export function Status() {
   return (
     <div id="status" hidden role="status">
@@ -79,10 +69,12 @@ export function ShareBox() {
       <div className="card" role="dialog" aria-modal="true" aria-labelledby="shareTtl">
         <h2 id="shareTtl">Kirim ke teman</h2>
         <form id="shareForm">
-          <label htmlFor="shareFrom">Dari</label>
-          <input id="shareFrom" maxLength={24} autoComplete="off" placeholder="namamu" />
           <label htmlFor="shareTo">Untuk</label>
           <input id="shareTo" maxLength={24} autoComplete="off" placeholder="nama temanmu" />
+          <label htmlFor="shareFrom">Dari</label>
+          <input id="shareFrom" maxLength={24} autoComplete="off" placeholder="namamu" />
+          <label htmlFor="shareTitle">Tulisan di label kaset</label>
+          <input id="shareTitle" maxLength={24} autoComplete="off" placeholder="mis. Lagu buat kamu" />
           <label htmlFor="shareMsg">Pesan singkat (maks. 140 huruf)</label>
           <textarea id="shareMsg" maxLength={140} rows={2} placeholder="mis. Dengarkan pelan-pelan ya"></textarea>
           <div className="row">
@@ -106,9 +98,8 @@ export function ShareBox() {
 
 export function GiftBox() {
   return (
-    <div id="gift" className="overlay" hidden>
-      <div className="card gift" role="dialog" aria-modal="true" aria-labelledby="giftTitle">
-        <div className="box" aria-hidden="true"><span className="lid"></span><span className="base"></span></div>
+    <div id="gift" hidden>
+      <div className="card gift" role="dialog" aria-labelledby="giftTitle">
         <h2 id="giftTitle">Ada kaset untukmu</h2>
         <p id="giftFrom" className="from"></p>
         <p id="giftMsg" className="msg"></p>

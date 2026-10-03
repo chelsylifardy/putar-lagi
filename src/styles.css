@@ -115,3 +115,10 @@ html,body{margin:0;height:100%;background:#241a12;overflow:hidden;color:var(--cr
 .handCursor[data-g="pinch"]{width:20px;height:20px;margin:-10px 0 0 -10px;background:#a8483e}
 .handCursor[data-g="fist"]{width:46px;height:46px;margin:-23px 0 0 -23px;background:var(--hc);opacity:.85}
 .gift .how{font-size:13px;color:#5b4d44;margin:-8px 0 12px}
+
+/* phones: blur behind buttons and the blended grain over the canvas are costly on mobile GPUs (Safari most of all) */
+@media (pointer:coarse){
+  .grain{display:none}
+  .chip,.btn,#status,#handBox{backdrop-filter:none;-webkit-backdrop-filter:none}
+  .btn,.chip{background:rgba(38,28,20,.86)}
+}

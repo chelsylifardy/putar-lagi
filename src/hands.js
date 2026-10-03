@@ -2,14 +2,14 @@
 // Each hand has a cursor and a gesture: 'open', 'pinch' (thumb + index) or 'fist'.
 // Pinch and fist are sent as pointer events (with `event.hand` attached), so the scene and the
 // HTML buttons work as with a mouse; the engine reads getHands() for two-hand interactions.
-import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 
 const WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 const PINCH_ON = 0.32, PINCH_OFF = 0.45; // thumb–index gap relative to palm size, with hysteresis
-const LOST_FRAMES = 8;                   // a hand may vanish briefly without dropping what it holds
+const LOST_FRAMES = 4;                   // a hand may vanish briefly without dropping what it holds
+const DETECT_MS = 50;                    // ~20 detections a second is plenty for a cursor
 
-let landmarker, stream, raf = 0, running = false;
+let landmarker, stream, raf = 0, running = false, lastDetect = 0;
 const hands = {}; // keyed by 'L' / 'R'
 
 const $ = s => document.querySelector(s);
@@ -60,8 +60,10 @@ function track() {
   if (!running) return;
   raf = requestAnimationFrame(track);
   const video = $('#handCam');
-  if (video.readyState < 2) return;
-  const res = landmarker.detectForVideo(video, performance.now());
+  const now = performance.now();
+  if (video.readyState < 2 || now - lastDetect < DETECT_MS) return;
+  lastDetect = now;
+  const res = landmarker.detectForVideo(video, now);
   const seen = new Set();
   (res.landmarks || []).forEach((lm, i) => {
     // the preview is mirrored, so MediaPipe's "Left" is the user's right hand
@@ -93,7 +95,7 @@ function track() {
 
 export async function startHands() {
   if (running) return;
-  const video_ = { width: 640, height: 480, facingMode: 'user' };
+  const video_ = { width: 480, height: 360, facingMode: 'user' };
   // ask for the microphone in the same native prompt, so pressing REC later starts right away
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: video_, audio: true });
@@ -105,6 +107,8 @@ export async function startHands() {
   const video = $('#handCam');
   video.srcObject = stream; await video.play();
   if (!landmarker) {
+    // loaded only when hand control starts, so phones never download it
+    const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision');
     const files = await FilesetResolver.forVisionTasks(WASM);
     const opts = { baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 2 };
     try { landmarker = await HandLandmarker.createFromOptions(files, opts); }

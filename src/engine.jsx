@@ -21,7 +21,7 @@ export async function startEngine() {
   const easeIn = t => t*t*t;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const coarse = matchMedia('(pointer: coarse)').matches;
-  const lowPower = coarse || Math.min(innerWidth, innerHeight) < 600;
+  const lowPower = coarse || navigator.maxTouchPoints > 1 || Math.min(innerWidth, innerHeight) < 600;
   const M = reduceMotion ? 0.45 : 1;   // object animation time scale
 
   await Promise.race([
@@ -31,15 +31,16 @@ export async function startEngine() {
 
   /* ───────────────────────── renderer / scene ───────────────────────── */
   const canvas = $('#scene');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
-  let pixelRatio = Math.min(devicePixelRatio, lowPower ? 1.5 : 2);
+  // phones have dense screens: render near 1x and skip MSAA, which costs the most there
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:!lowPower, powerPreference:'high-performance' });
+  let pixelRatio = Math.min(devicePixelRatio, lowPower ? 1.25 : 2);
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(innerWidth, innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = lowPower ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
   const scene = new THREE.Scene();
@@ -58,7 +59,7 @@ export async function startEngine() {
   sun.position.set(-52, 40, -24).add(SUN_TARGET);
   sun.target.position.copy(SUN_TARGET);
   sun.castShadow = true;
-  const shadowSize = lowPower ? 1024 : 2048;
+  const shadowSize = lowPower ? 768 : 2048;
   sun.shadow.mapSize.set(shadowSize, shadowSize);
   Object.assign(sun.shadow.camera, { left:-36, right:36, top:32, bottom:-32, near:20, far:150 });
   sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.04;
@@ -1210,7 +1211,7 @@ export async function startEngine() {
   }
 
   /* ───────────────────────── frame loop ───────────────────────── */
-  let angA=0, angB=0, last=performance.now(), fpsAcc=0, fpsN=0, degraded=lowPower, meterLvl=0;
+  let angA=0, angB=0, last=performance.now(), fpsAcc=0, fpsN=0, quality=2, meterLvl=0;
   const H_STEP=1/60;
   /* ───────────────────────── two-hand control ───────────────────────── */
   const handMode = () => getHands().length>0;
@@ -1335,8 +1336,13 @@ export async function startEngine() {
     renderer.render(scene,camera);
 
     // adaptive quality
-    if(!degraded && now>3000){ fpsAcc+=dt; fpsN++; if(fpsN>=120){ if(fpsAcc/fpsN>1/42){ degraded=true; pixelRatio=Math.min(pixelRatio,1.25); renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth,innerHeight,false);
-        sun.shadow.mapSize.set(1024,1024); sun.shadow.map?.dispose(); sun.shadow.map=null; tape.iter=9; } fpsAcc=0; fpsN=0; } }
+    // adaptive quality: step down while frames stay slow (each step is cheap to apply)
+    if(quality>0 && now>2500){ fpsAcc+=dt; fpsN++; if(fpsN>=90){ if(fpsAcc/fpsN>1/40){
+        quality--;
+        if(quality===1){ pixelRatio=Math.min(pixelRatio,lowPower?1:1.25); renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth,innerHeight,false);
+          sun.shadow.mapSize.set(512,512); sun.shadow.map?.dispose(); sun.shadow.map=null; tape.iter=8; }
+        else { sun.castShadow=false; if(dust) dust.visible=false; tape.iter=7; }
+      } fpsAcc=0; fpsN=0; } }
     requestAnimationFrame(frame);
   }
 

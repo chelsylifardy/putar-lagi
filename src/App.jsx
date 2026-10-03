@@ -7,7 +7,10 @@ export default function App() {
   useEffect(() => {
     startEngine();
     // hand control starts on its own; without a camera (or permission) the mouse/touch still works
-    startHands().catch(err => { console.warn('hand control off:', err); stopHands(); });
+    // hand control is for desktops with a webcam; on phones touch is the natural input and
+    // running the camera model next to the 3D scene makes them stutter
+    const touch = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;
+    if (!touch) startHands().catch(err => { console.warn('hand control off:', err); stopHands(); });
   }, []);
   return (
     <>

@@ -760,12 +760,6 @@ export async function startEngine() {
     });
   }
 
-  /* title editor */
-  const titleBox=$('#titleBox'), titleInput=$('#titleInput');
-  function openTitle(){ titleInput.value=S.title; titleBox.hidden=false; setTimeout(()=>titleInput.focus(),30); }
-  $('#titleCancel').onclick=()=>{ titleBox.hidden=true; };
-  titleBox.addEventListener('keydown',e=>{ if(e.key==='Escape') titleBox.hidden=true; });
-  $('#titleForm').onsubmit=e=>{ e.preventDefault(); S.title=titleInput.value.trim().slice(0,24); drawLabel(); titleBox.hidden=true; if(S.title) toast('Tertulis di label.',1500); };
 
   /* ───────────────────────── mechanics ───────────────────────── */
   function setKey(a,down){ rec3d.keys[a].userData.pressed=down; }
@@ -1097,7 +1091,6 @@ export async function startEngine() {
   const keyMeshes=[]; Object.values(rec3d.keys).forEach(k=>k.children.forEach(c=>keyMeshes.push(c)));
   function hitKey(){ const h=ray.intersectObjects(keyMeshes,false)[0]; return h ? h.object.userData.key.userData.action : null; }
   function hitPencil(){ return ray.intersectObject(pen.hit,false).length>0; }
-  function hitLabel(){ return ray.intersectObject(cas.label,false).length>0; }
   function pickTape(e){
     const P=tape.p; let best=-1, bd=e.pointerType==='touch'?60:40;
     for(let i=1;i<P.length-1;i++){ const s=toScreen(cassette.localToWorld(P[i].clone())); const d=Math.hypot(s.x-e.clientX,s.y-e.clientY); if(d<bd){ bd=d; best=i; } }
@@ -1130,7 +1123,6 @@ export async function startEngine() {
       capture(e.pointerId); return;
     }
     const k=hitKey(); if(k){ pressAction(k); return; }
-    if(hitLabel() && ['idle','recorded','restored','ejected'].includes(st)) openTitle();
   });
   canvas.addEventListener('pointermove',e=>{
     if(drag && e.pointerId!==drag.id) return;
@@ -1180,7 +1172,7 @@ export async function startEngine() {
     else if(st==='rewinding'){ label='Putar melingkar searah jarum jam'; cur='grab'; }
     else if(st==='tangled' && hitPencil()){ label='Seret pensil ke lubang kaset'; cur='grab'; }
     else if((st==='ejected'||st==='pulling'||st==='tangled') && pickTape(e)>0){ label='Tarik pita'; cur='grab'; }
-    else { const k=hitKey(); if(k){ label=KEY_NAMES[k]; cur='pointer'; } else if(hitLabel() && ['idle','recorded','restored','ejected'].includes(st)){ label='Tulis judul di label'; cur='text'; } }
+    else { const k=hitKey(); if(k){ label=KEY_NAMES[k]; cur='pointer'; } }
     canvas.style.cursor=cur;
     if(label){ ui.tip.textContent=label; ui.tip.hidden=false; ui.tip.style.transform=`translate(${e.clientX+14}px,${e.clientY+14}px)`; } else ui.tip.hidden=true;
   }

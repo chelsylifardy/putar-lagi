@@ -47,22 +47,6 @@ export function Modal() {
   );
 }
 
-export function TitleEditor() {
-  return (
-    <div id="titleBox" className="overlay" hidden>
-      <form className="card" id="titleForm" role="dialog" aria-modal="true" aria-labelledby="ttl">
-        <h2 id="ttl">Tulis di label</h2>
-        <label htmlFor="titleInput">Judul pendek (maks. 24 huruf)</label>
-        <input id="titleInput" maxLength={24} autoComplete="off" placeholder="mis. Buat Ibu" />
-        <div className="row">
-          <button type="button" className="btn" id="titleCancel">Batal</button>
-          <button className="btn primary">Tulis</button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
 export function ShareBox() {
   return (
     <div id="shareBox" className="overlay" hidden>

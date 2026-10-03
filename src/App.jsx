@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { startEngine } from './engine.jsx';
 import { startHands, stopHands } from './hands.js';
-import { Brand, Status, BottomBar, Feedback, Modal, TitleEditor, ShareBox, GiftBox, HandControl } from './components/Overlay.jsx';
+import { Brand, Status, BottomBar, Feedback, Modal, ShareBox, GiftBox, HandControl } from './components/Overlay.jsx';
 
 export default function App() {
   useEffect(() => {
@@ -19,7 +19,6 @@ export default function App() {
       <BottomBar />
       <Feedback />
       <Modal />
-      <TitleEditor />
       <ShareBox />
       <GiftBox />
       <HandControl />

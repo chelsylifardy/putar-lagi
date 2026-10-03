@@ -734,7 +734,7 @@ export async function startEngine() {
       const demo=S.rec?.demo;
       if(S.hasPlayed){ setInstr('Mau iseng sedikit? Keluarkan kasetnya.'); hs=()=>keyWorld('stop'); }
       else { setInstr(demo?'Ini rekaman contoh (demo), bukan suaramu. Tekan ▶ untuk mendengarkan.':'Tekan ▶ untuk mendengarkan suaramu.'); hs=()=>keyWorld('play'); }
-      setControls(demo?[]:[{label:'✉ Kirim ke teman',primary:true,onClick:openShare}]);
+      setControls(demo?[]:[S.rec?.received?{label:'↩ Balas pesan',primary:true,onClick:reply}:{label:'✉ Kirim ke teman',primary:true,onClick:openShare}]);
     }
     else if(st==='playing'){
       setInstr(S.paused?'Dijeda.':(S.rec?.demo?'Memutar rekaman contoh (demo)…':'Mendengarkan…'));
@@ -743,7 +743,7 @@ export async function startEngine() {
     else if(st==='ejected' || st==='pulling'){ setInstr('Tarik pitanya. Pelan-pelan.'); setControls(st==='ejected'?[{label:'Kembalikan ke recorder',onClick:()=>replay(false)}]:[]); if(st==='ejected') hs=tapeMidWorld; }
     else if(st==='tangled'){ setInstr('Masukkan pensil ke lubang kaset.'); setControls([{label:'✎ Pasang pensil',primary:true,onClick:()=>insertPencil()}]); hs=pencilMid; }
     else if(st==='rewinding'){ setInstr('Putar pensilnya. Gulung kembali.'); setControls([{label:'Tahan untuk menggulung',hold:true}]); }
-    else if(st==='restored'){ setInstr('Sudah rapi. Putar lagi?'); setControls([{label:'▶ Dengarkan lagi',primary:true,onClick:()=>replay(true)},{label:'✉ Kirim ke teman',onClick:openShare},{label:'⤓ Simpan rekaman',onClick:download}]); }
+    else if(st==='restored'){ setInstr('Sudah rapi. Putar lagi?'); setControls([{label:'▶ Dengarkan lagi',primary:true,onClick:()=>replay(true)},S.rec?.received?{label:'↩ Balas pesan',onClick:reply}:{label:'✉ Kirim ke teman',onClick:openShare},{label:'⤓ Simpan rekaman',onClick:download}]); }
     else if(st==='gift'){ setInstr(''); setControls([]); }
     else if(st==='giftOpen'){ setInstr('Jepit kasetnya untuk mengambil, lalu bawa ke recorder.'); setControls([]); hs=()=>cassette.position.clone().setY(1.4); }
     else setControls([]);
@@ -787,7 +787,7 @@ export async function startEngine() {
     if(['ejecting','ejected','pulling','tangled','rewinding','settling'].includes(st)){ tapKey(a); if(st!=='ejecting') hint('Rapikan dulu pitanya.'); return; }
     if(a==='rec'){
       if(st==='recording') return;
-      if(S.rec){
+      if(S.rec && !S.rec.received){
         const v=await dialog('Rekam ulang?','Rekaman yang sekarang akan diganti dan tidak bisa dikembalikan. Simpan dulu kalau masih ingin disimpan.',
           [{label:'Batal',value:null},{label:'Simpan dulu',value:'save'},{label:'Ganti rekaman',value:'yes',primary:true}]);
         if(v==='save'){ download(); return; }
@@ -953,6 +953,7 @@ export async function startEngine() {
   function openShare(){
     if(!S.rec) return;
     $('#shareTitle').value=S.title;
+    if(S.replyTo){ $('#shareTo').value||=S.replyTo.to; $('#shareFrom').value||=S.replyTo.from; }
     shareForm.hidden=false; shareDone.hidden=true; shareBox.hidden=false;
     setTimeout(()=>$('#shareTo').focus(),30);
   }
@@ -997,13 +998,15 @@ export async function startEngine() {
     S.state='gift';
     return true;
   }
+  function reply(){ S.title=''; drawLabel(); pressAction('rec'); }
   async function openGift(){
     if(!pendingGift || S.busy || S.state!=='gift') return;
     const { meta, blob }=pendingGift; pendingGift=null;
     ensureCtx(); S.busy=true;
     $('#gift').classList.add('gone'); setTimeout(()=>{ $('#gift').hidden=true; },400);
     if(S.rec) URL.revokeObjectURL(S.rec.url);
-    S.rec={ blob, url:URL.createObjectURL(blob), mime:blob.type, ext:extFor(blob.type), duration:meta.d||0, demo:false };
+    S.rec={ blob, url:URL.createObjectURL(blob), mime:blob.type, ext:extFor(blob.type), duration:meta.d||0, demo:false, received:true };
+    S.replyTo={ to:meta.f||'', from:meta.to||'' };
     audioEl.src=S.rec.url; audioEl.load();
     const g=gift.group, lid=gift.lid, H=GIFT.H;
     // a little shake before the lid gives

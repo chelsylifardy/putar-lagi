@@ -87,6 +87,7 @@ export function GiftBox() {
         <h2 id="giftTitle">Ada kaset untukmu</h2>
         <p id="giftFrom" className="from"></p>
         <p id="giftMsg" className="msg"></p>
+        <p id="giftHow" className="how" hidden>🤏🤏 Jepit kedua sisi tutup kotak, lalu angkat</p>
         <div className="row"><button type="button" className="btn primary" id="giftOpen">Buka kotak</button></div>
       </div>
     </div>
@@ -97,7 +98,6 @@ export function HandControl() {
   return (
     <>
       <div id="handBox" hidden><video id="handCam" playsInline muted></video><span id="handHint">Jepit telunjuk + jempol untuk menekan</span></div>
-      <div id="handCursor" hidden aria-hidden="true"></div>
     </>
   );
 }

@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { getHands } from './hands.js';
 
 let started = false;
 
@@ -357,7 +358,6 @@ export async function startEngine() {
   const rec3d = buildRecorder();
   const recorder = rec3d.group; recorder.position.set(-9,0,-2); scene.add(recorder);
   const LID_OPEN = -1.12;
-  rec3d.lid.rotation.x = LID_OPEN;
   const SLOT = V(-9+4, 2.82, -2-1.95);
   const CAS_REST = { pos:V(7.8,0,.8), rot:-.2 };
   const DESK_POS = V(6,0,2.2);
@@ -748,6 +748,11 @@ export async function startEngine() {
     else if(st==='gift'){ setInstr(''); setControls([]); }
     else if(st==='giftOpen'){ setInstr('Jepit kasetnya untuk mengambil, lalu bawa ke recorder.'); setControls([]); hs=()=>cassette.position.clone().setY(1.4); }
     else setControls([]);
+    if(handMode()){
+      const how={ ejected:'✊ Tahan kaset · 🤏 tarik pitanya', pulling:'✊ Tahan kaset · 🤏 tarik pitanya', rewinding:'✊ Tahan kaset · 🤏 putar pensilnya',
+        giftOpen:'🤏 Buka tutup recorder · ✊ bawa kasetnya masuk', idle:S.inRecorder?null:'🤏 Buka tutup recorder · ✊ bawa kasetnya masuk' }[st];
+      if(how) setInstr(how);
+    }
     S.hot=hs; ui.hot.hidden=!hs;
   }
 
@@ -770,15 +775,16 @@ export async function startEngine() {
   async function moveLid(open){ const from=rec3d.lid.rotation.x, to=open?LID_OPEN:0; if(Math.abs(from-to)<.01) return;
     await tween(.5*M,k=>rec3d.lid.rotation.x=lerp(from,to,k)); if(!open) sfx('clunk'); }
 
-  async function insertCassette(){
+  async function insertCassette(opts={}){
     if(S.inRecorder) return;
     const view=goView('recorder',1.3);
-    await moveLid(true);
+    if(!opts.keepLid) await moveLid(true);
     const from=cassette.position.clone(), r0=cassette.rotation.y, above=SLOT.clone().add(V(0,3.4,3));
     await tween(1.0*M,k=>{ cassette.position.lerpVectors(from,above,k); cassette.position.y=lerp(from.y,above.y,k)+Math.sin(k*Math.PI)*1.5; cassette.rotation.y=lerp(r0,0,k); cassette.rotation.x=Math.sin(k*Math.PI)*-.12; });
     await tween(.45*M,k=>cassette.position.lerpVectors(above,SLOT,k),easeOut);
     sfx('click'); S.inRecorder=true;
-    await moveLid(false); await view;
+    if(!opts.keepLid) await moveLid(false);
+    await view;
   }
 
   async function pressAction(a){
@@ -1001,7 +1007,7 @@ export async function startEngine() {
     return true;
   }
   function reply(){ S.title=''; drawLabel(); pressAction('rec'); }
-  async function openGift(){
+  async function openGift(lifted){
     if(!pendingGift || S.busy || S.state!=='gift') return;
     const { meta, blob }=pendingGift; pendingGift=null;
     ensureCtx(); S.busy=true;
@@ -1012,12 +1018,12 @@ export async function startEngine() {
     audioEl.src=S.rec.url; audioEl.load();
     const g=gift.group, lid=gift.lid, H=GIFT.H;
     // a little shake before the lid gives
-    await tween(.55*M,k=>{ const a=Math.sin(k*Math.PI*6)*(1-k); g.rotation.z=a*.05; g.rotation.x=a*.03; g.position.y=Math.abs(a)*.25; },t=>t);
+    if(!lifted) await tween(.55*M,k=>{ const a=Math.sin(k*Math.PI*6)*(1-k); g.rotation.z=a*.05; g.rotation.x=a*.03; g.position.y=Math.abs(a)*.25; },t=>t);
     g.rotation.set(0,0,0); g.position.y=0;
     sfx('click');
     // lid pops up, tumbles and lands beside the box
-    const l0=lid.position.clone(), up=V(2.5,H+6,-1), land=V(11,1.2,9);
-    await tween(.45*M,k=>{ lid.position.lerpVectors(l0,up,k); lid.rotation.set(-.35*k,0,.25*k); },easeOut);
+    const l0=lid.position.clone(), z0=lid.rotation.z, up=V(2.5,H+6,-1), land=V(11,1.2,9);
+    await tween(.45*M,k=>{ lid.position.lerpVectors(l0,up,k); lid.rotation.set(-.35*k,0,lerp(z0,.25,k)); },easeOut);
     await tween(.6*M,k=>{ lid.position.lerpVectors(up,land,k); lid.position.y=lerp(up.y,land.y,easeIn(k)); lid.rotation.set(lerp(-.35,0,k),.5*k,lerp(.25,0,k)); },t=>t);
     lid.position.copy(land); sfx('clunk');
     // the cassette peeks up a little, waiting to be picked up
@@ -1026,9 +1032,9 @@ export async function startEngine() {
     S.busy=false; setState('giftOpen');
   }
   const HOLD_Y=6;
-  function grabCassette(id){
+  function grabCassette(id,hand){
     const from=cassette.position.clone();
-    drag={ type:'cassette', id, home:from, homeRot:cassette.rotation.y, gift:S.state==='giftOpen' }; capture(id); canvas.style.cursor='grabbing'; ui.hot.hidden=true; sfx('click');
+    drag={ type:'cassette', id, hand, home:from, homeRot:cassette.rotation.y, gift:S.state==='giftOpen' }; capture(id); canvas.style.cursor='grabbing'; ui.hot.hidden=true; sfx('click');
     setInstr('Bawa ke atas recorder, lalu lepaskan.');
     tween(.25*M,k=>{ cassette.position.y=lerp(from.y,HOLD_Y,k); cassette.rotation.x=-.18*k; },easeOut);
   }
@@ -1043,16 +1049,25 @@ export async function startEngine() {
     const p=cassette.position, d=Math.hypot(p.x-SLOT.x,p.z-SLOT.z);
     // over the recorder on screen, or close enough to the slot in the world
     if(d<9 || ray.intersectObject(recorder,true).length){
-      S.busy=true; const prev=S.state; S.state='inserting'; renderUI();
-      if(!d0.gift){ tapeReset(); await insertCassette(); S.busy=false; S.state=prev; renderUI(); return; }
-      const fade=tween(1.2*M,k=>{ gift.mats.forEach(m=>m.opacity=1-k); gift.shadow.material.opacity=.5*(1-k); });
-      tapeReset(); await insertCassette(); await fade;
-      gift.group.visible=false;
-      S.busy=false; S.hasPlayed=false; S.state='recorded'; renderUI(); S.forceRestart=true; play();
-      return;
+      const byHand=!!d0.hand && handMode();
+      if(byHand && !lidIsOpen()){ hint('🤏 Buka dulu tutup recorder dengan tangan satunya'); }
+      else {
+        S.busy=true; const prev=S.state; S.state='inserting'; renderUI();
+        const fade=d0.gift ? tween(1.2*M,k=>{ gift.mats.forEach(m=>m.opacity=1-k); gift.shadow.material.opacity=.5*(1-k); }) : null;
+        tapeReset(); await insertCassette({ keepLid:byHand });
+        const done=async()=>{
+          if(fade) await fade;
+          S.busy=false;
+          if(d0.gift){ gift.group.visible=false; S.hasPlayed=false; S.state='recorded'; renderUI(); S.forceRestart=true; play(); }
+          else { S.state=prev; renderUI(); }
+        };
+        if(byHand && lidHands.size){ setInstr('Lepaskan tutupnya.'); awaitLid=done; }
+        else { if(byHand) await moveLid(false); done(); }
+        return;
+      }
     }
     // missed the recorder: it settles back where it was picked up
-    S.busy=true; hint('Bawa ke recorder ya.');
+    S.busy=true; if(!ui.hint.classList.contains('show')) hint('Bawa ke recorder ya.');
     const from=p.clone(), to=d0.home.clone().setY(d0.gift?.3:d0.home.y);
     await tween(.6*M,k=>{ cassette.position.lerpVectors(from,to,k); cassette.position.y=lerp(from.y,to.y,easeIn(k)); cassette.rotation.x=lerp(-.18,0,k); });
     cassette.rotation.y=d0.homeRot;
@@ -1113,21 +1128,23 @@ export async function startEngine() {
   canvas.addEventListener('pointerdown',e=>{
     if(drag || S.busy || !$('#modal').hidden) return;
     ensureCtx(); setRay(e); const st=S.state;
-    if(st==='gift'){ if(ray.intersectObject(gift.group,true).length) openGift(); return; }
-    if(st==='idle' && !S.inRecorder && ray.intersectObject(cassette,true).length){ grabCassette(e.pointerId); return; }
-    if(st==='giftOpen'){ if(ray.intersectObject(cassette,true).length || ray.intersectObject(gift.base,true).length) grabCassette(e.pointerId); return; }
+    if(st==='gift'){ if(!e.hand && ray.intersectObject(gift.group,true).length) openGift(); return; }
+    if(e.hand?.gesture==='fist' && ['ejected','pulling','tangled','rewinding'].includes(st)) return;
+    if(st==='idle' && !S.inRecorder && ray.intersectObject(cassette,true).length){ grabCassette(e.pointerId,e.hand?.id); return; }
+    if(st==='giftOpen'){ if(ray.intersectObject(cassette,true).length || ray.intersectObject(gift.base,true).length) grabCassette(e.pointerId,e.hand?.id); return; }
     if(st==='tangled' && hitPencil()){
       drag={ type:'pencil', id:e.pointerId }; capture(e.pointerId); canvas.style.cursor='grabbing'; ui.hot.hidden=true; sfx('click'); return;
     }
     if(st==='ejected'||st==='pulling'||st==='tangled'){
       const gi=pickTape(e);
-      if(gi>0){ drag={ type:'tape', id:e.pointerId }; capture(e.pointerId); canvas.style.cursor='grabbing';
+      if(gi>0 && e.hand && !cassetteHeld(e.hand.id)){ hint('✊ Tahan kasetnya dulu, lalu 🤏 tarik pitanya'); return; }
+      if(gi>0){ drag={ type:'tape', id:e.pointerId, hand:e.hand?.id, side:e.hand?sideOfHolder(e.hand.id,e.clientX):0 }; capture(e.pointerId); canvas.style.cursor='grabbing';
         const t=tapeTargetFromRay(); tape.raw.copy(t||tape.p[gi]); tape.grab=gi; tape.target.copy(tape.p[gi]); tape.active=true;
         Object.assign(pv,{ x:e.clientX, y:e.clientY, t:performance.now(), vx:0, vy:0 }); tape.mess=.3;
         if(st==='ejected') setState('pulling'); return; }
     }
     if(st==='rewinding'){
-      const c=toScreen(hubWorld()); drag={ type:'wind', id:e.pointerId, cx:c.x, cy:c.y, lastA:Math.atan2(e.clientY-c.y,e.clientX-c.x), lastT:performance.now() };
+      const c=toScreen(hubWorld()); drag={ type:'wind', id:e.pointerId, hand:e.hand?.id, cx:c.x, cy:c.y, lastA:Math.atan2(e.clientY-c.y,e.clientX-c.x), lastT:performance.now() };
       capture(e.pointerId); return;
     }
     const k=hitKey(); if(k){ pressAction(k); return; }
@@ -1138,6 +1155,8 @@ export async function startEngine() {
     if(!drag){ hover(e); return; }
     if(drag.type==='cassette'){ moveCassette(); }
     else if(drag.type==='tape'){
+      if(drag.hand && !cassetteHeld(drag.hand)){ const id=drag.id; drag=null; tape.grab=-1; try{ canvas.releasePointerCapture(id); }catch{} hint('Kasetnya terlepas.'); return; }
+      if(drag.hand){ const sd=sideOfHolder(drag.hand,e.clientX); if(sd && drag.side && sd!==drag.side){ tape.mess=1; drag.side=sd; } }
       const t=tapeTargetFromRay(); if(t) tape.raw.copy(t);
       const now=performance.now(), dt=Math.max(1,now-pv.t), vx=(e.clientX-pv.x)/dt, vy=(e.clientY-pv.y)/dt;
       const sp=Math.hypot(vx,vy), sp0=Math.hypot(pv.vx,pv.vy);
@@ -1154,6 +1173,7 @@ export async function startEngine() {
       let d=a-drag.lastA; if(d>Math.PI) d-=Math.PI*2; if(d<-Math.PI) d+=Math.PI*2; drag.lastA=a;
       if(Math.hypot(dx,dy)<12) return;
       const now=performance.now(), dt=Math.max(1,now-drag.lastT)/1000; drag.lastT=now;
+      if(drag.hand && !cassetteHeld(drag.hand)){ casSpin=clamp(casSpin+d*.35,-.5,.5); if(!ui.hint.classList.contains('show')) hint('✊ Tahan kasetnya dengan tangan satunya'); return; }
       if(d>0){ wind.pending=Math.min(wind.pending+d,5); wind.vel=lerp(wind.vel,d/dt,.3); }
       else if(d<-.015){ wind.wobV+=d*2.2; wind.vel=0; if(!ui.hint.classList.contains('show')) hint('↻ Putar searah jarum jam untuk menggulung'); }
     }
@@ -1189,9 +1209,58 @@ export async function startEngine() {
   /* ───────────────────────── frame loop ───────────────────────── */
   let angA=0, angB=0, last=performance.now(), fpsAcc=0, fpsN=0, degraded=lowPower, meterLvl=0;
   const H_STEP=1/60;
+  /* ───────────────────────── two-hand control ───────────────────────── */
+  const handMode = () => getHands().length>0;
+  const ray2=new THREE.Raycaster(), ndc2=new THREE.Vector2();
+  function handOver(h,obj){ const r=canvas.getBoundingClientRect(); ndc2.set(((h.x-r.left)/r.width)*2-1, -((h.y-r.top)/r.height)*2+1); ray2.setFromCamera(ndc2,camera); return ray2.intersectObject(obj,true).length>0; }
+  // a fist on the cassette (by the other hand) holds it still
+  function holder(exceptId){ const c=toScreen(cassette.localToWorld(V(0,.6,0))), r=Math.min(innerWidth,innerHeight)*.16;
+    return getHands().find(h=>h.id!==exceptId && h.gesture==='fist' && Math.hypot(h.x-c.x,h.y-c.y)<r); }
+  const cassetteHeld = id => !!holder(id);
+  const sideOfHolder = (id,x) => { const h=holder(id); return h ? Math.sign(x-h.x)||1 : 0; };
+  let casSpin=0;
+
+  // gift lid: two pinches lift it; one only tips it
+  let giftGrip={};
+  function pollGift(){
+    if(S.state!=='gift' || S.busy) return;
+    const hs=getHands(), lid=gift.lid;
+    for(const h of hs){ if(h.gesture!=='pinch') delete giftGrip[h.id]; else if(!giftGrip[h.id] && handOver(h,gift.group)) giftGrip[h.id]={ x:h.x, y0:h.y }; }
+    for(const id in giftGrip) if(!hs.some(h=>h.id===id)) delete giftGrip[id];
+    const ids=Object.keys(giftGrip); let ty=GIFT.H, rz=0;
+    if(ids.length>=2){
+      const lift=ids.reduce((a,id)=>a+giftGrip[id].y0-hs.find(h=>h.id===id).y,0)/ids.length;
+      ty=GIFT.H+clamp(lift/40,0,3.5);
+      if(lift>130){ giftGrip={}; openGift(true); return; }
+    } else if(ids.length===1){
+      rz=(giftGrip[ids[0]].x<toScreen(gift.group.position).x?-1:1)*.12; ty=GIFT.H+.35;
+      if(!ui.hint.classList.contains('show')) hint('🤏 Jepit sisi satunya juga, lalu angkat');
+    }
+    lid.position.y=lerp(lid.position.y,ty,.3); lid.rotation.z=lerp(lid.rotation.z,rz,.2);
+  }
+
+  // recorder lid: stays open while a hand pinches it
+  let lidHands=new Set(), lidMoving=false, awaitLid=null;
+  const lidIsOpen = () => rec3d.lid.rotation.x < -.5;
+  function pollLid(){
+    if(!awaitLid && !(handMode() && ((S.state==='idle' && !S.inRecorder) || S.state==='giftOpen'))) return;
+    const hs=getHands();
+    for(const h of hs){ if(h.gesture!=='pinch') lidHands.delete(h.id); else if(!lidHands.has(h.id) && drag?.hand!==h.id && handOver(h,rec3d.lid)) lidHands.add(h.id); }
+    for(const id of [...lidHands]) if(!hs.some(h=>h.id===id)) lidHands.delete(id);
+    if(lidMoving) return;
+    if(lidHands.size && !lidIsOpen() && !S.busy){ lidMoving=true; sfx('click'); moveLid(true).then(()=>{ lidMoving=false; }); }
+    else if(!lidHands.size && lidIsOpen() && (awaitLid || !S.busy)){
+      lidMoving=true; const cb=awaitLid; awaitLid=null;
+      moveLid(false).then(()=>{ lidMoving=false; sfx('click'); cb?.(); });
+    }
+  }
+  addEventListener('handschange',()=>{ if(!S.busy) renderUI(); const how=$('#giftHow'); if(how) how.hidden=!handMode(); });
+
   function frame(now){
     const dt=Math.min(.05,(now-last)/1000); last=now;
     updateTweens(dt);
+    pollGift(); pollLid();
+    if(S.state==='rewinding'){ cassette.rotation.y=casSpin; casSpin*=.9; }
 
     // camera
     let sway=V();

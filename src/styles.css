@@ -107,7 +107,12 @@ html,body{margin:0;height:100%;background:#241a12;overflow:hidden;color:var(--cr
 #handBox[hidden]{display:none}
 #handBox video{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;transform:scaleX(-1)}
 #handBox span{display:block;padding:5px 6px}
-#handCursor{position:fixed;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;z-index:30;pointer-events:none;
-  border:3px solid #fff3dc;box-shadow:0 0 0 2px rgba(43,35,32,.5),0 4px 14px rgba(0,0,0,.4);transition:width .12s,height .12s,margin .12s,background .12s}
-#handCursor[hidden]{display:none}
-#handCursor.pinch{width:22px;height:22px;margin:-11px 0 0 -11px;background:#a8483e}
+/* hand cursors: hollow when open, small dot when pinching, solid disc when making a fist */
+.handCursor{position:fixed;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;z-index:30;pointer-events:none;
+  border:3px solid var(--hc);box-shadow:0 0 0 2px rgba(43,35,32,.5),0 4px 14px rgba(0,0,0,.4);transition:width .12s,height .12s,margin .12s,background .12s}
+.handCursor.R{--hc:#fff3dc}
+.handCursor.L{--hc:#9fc3e6}
+.handCursor[hidden]{display:none}
+.handCursor[data-g="pinch"]{width:20px;height:20px;margin:-10px 0 0 -10px;background:#a8483e}
+.handCursor[data-g="fist"]{width:46px;height:46px;margin:-23px 0 0 -23px;background:var(--hc);opacity:.85}
+.gift .how{font-size:13px;color:#5b4d44;margin:-8px 0 12px}

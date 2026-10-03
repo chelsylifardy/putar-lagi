@@ -31,9 +31,9 @@ export async function startEngine() {
 
   /* ───────────────────────── renderer / scene ───────────────────────── */
   const canvas = $('#scene');
-  // phones have dense screens: render near 1x and skip MSAA, which costs the most there
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias:!lowPower, powerPreference:'high-performance' });
-  let pixelRatio = Math.min(devicePixelRatio, lowPower ? 1.25 : 2);
+  // dense (2x+) screens are sharp without MSAA, which is costly on phones
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:devicePixelRatio<2, powerPreference:'high-performance' });
+  let pixelRatio = Math.min(devicePixelRatio, 2);
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(innerWidth, innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -59,7 +59,7 @@ export async function startEngine() {
   sun.position.set(-52, 40, -24).add(SUN_TARGET);
   sun.target.position.copy(SUN_TARGET);
   sun.castShadow = true;
-  const shadowSize = lowPower ? 768 : 2048;
+  const shadowSize = lowPower ? 1024 : 2048;
   sun.shadow.mapSize.set(shadowSize, shadowSize);
   Object.assign(sun.shadow.camera, { left:-36, right:36, top:32, bottom:-32, near:20, far:150 });
   sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.04;
@@ -488,7 +488,7 @@ export async function startEngine() {
   }
 
   /* dust motes */
-  const dust = (()=>{ if(reduceMotion) return null; const N=lowPower?60:140, pos=new Float32Array(N*3), r=rng(4);
+  const dust = (()=>{ if(reduceMotion || lowPower) return null; const N=lowPower?60:140, pos=new Float32Array(N*3), r=rng(4);
     for(let i=0;i<N;i++){ pos[i*3]=-26+r()*40; pos[i*3+1]=2+r()*26; pos[i*3+2]=-20+r()*30; }
     const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
     const p=new THREE.Points(geo,new THREE.PointsMaterial({ color:'#ffe2b8', size:.14, transparent:true, opacity:.4, depthWrite:false, blending:THREE.AdditiveBlending }));
@@ -1211,7 +1211,7 @@ export async function startEngine() {
   }
 
   /* ───────────────────────── frame loop ───────────────────────── */
-  let angA=0, angB=0, last=performance.now(), fpsAcc=0, fpsN=0, quality=2, meterLvl=0;
+  let angA=0, angB=0, last=performance.now(), fpsAcc=0, fpsN=0, quality=2, meterLvl=0, stillUntil=0, needsRender=true;
   const H_STEP=1/60;
   /* ───────────────────────── two-hand control ───────────────────────── */
   const handMode = () => getHands().length>0;
@@ -1268,7 +1268,7 @@ export async function startEngine() {
 
     // camera
     let sway=V();
-    if(!reduceMotion && !drag && (cam.view==='intro'||cam.view==='finished')){ const t=now/1000; sway.set(Math.sin(t*.21)*.5,Math.sin(t*.17)*.3,0); }
+    if(!reduceMotion && !lowPower && !drag && (cam.view==='intro'||cam.view==='finished')){ const t=now/1000; sway.set(Math.sin(t*.21)*.5,Math.sin(t*.17)*.3,0); }
     camera.position.copy(cam.pos).add(sway); camera.lookAt(cam.look);
     { const d=cam.pos.distanceTo(cam.look); scene.fog.near=d+35; scene.fog.far=d+140; }
 
@@ -1333,20 +1333,25 @@ export async function startEngine() {
 
     if(dust){ const a=dust.geometry.attributes.position; for(let i=0;i<a.count;i++){ let y=a.getY(i)+dt*.12; if(y>28) y=2; a.setY(i,y); a.setX(i,a.getX(i)+Math.sin(now/3000+i)*dt*.05); } a.needsUpdate=true; }
 
-    renderer.render(scene,camera);
+    // render only while something moves; a still desk costs nothing (keeps phones cool and smooth)
+    const moving = tweens.length || drag || cam.moving || tape.active || dust || !lowPower || awaitLid || lidHands.size ||
+      ['recording','playing','pulling','rewinding','settling','ejecting','inserting','gift'].includes(S.state) || S.busy;
+    if(moving) stillUntil=now+600;
+    if(now<stillUntil || needsRender){ needsRender=false; renderer.render(scene,camera); }
 
     // adaptive quality
     // adaptive quality: step down while frames stay slow (each step is cheap to apply)
     if(quality>0 && now>2500){ fpsAcc+=dt; fpsN++; if(fpsN>=90){ if(fpsAcc/fpsN>1/40){
         quality--;
-        if(quality===1){ pixelRatio=Math.min(pixelRatio,lowPower?1:1.25); renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth,innerHeight,false);
-          sun.shadow.mapSize.set(512,512); sun.shadow.map?.dispose(); sun.shadow.map=null; tape.iter=8; }
-        else { sun.castShadow=false; if(dust) dust.visible=false; tape.iter=7; }
+        if(quality===1){ sun.shadow.mapSize.set(512,512); sun.shadow.map?.dispose(); sun.shadow.map=null; tape.iter=8; }
+        else { pixelRatio=Math.min(pixelRatio,1.5); renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth,innerHeight,false); if(dust) dust.visible=false; tape.iter=7; }
       } fpsAcc=0; fpsN=0; } }
     requestAnimationFrame(frame);
   }
 
-  addEventListener('resize',()=>{ applyFov(); renderer.setSize(innerWidth,innerHeight,false);
+  // any touch wakes the renderer for a moment (key presses, hover tips, small settles)
+  for(const ev of ['pointerdown','pointermove','pointerup']) canvas.addEventListener(ev,()=>{ stillUntil=Math.max(stillUntil,performance.now()+1200); },{ passive:true });
+  addEventListener('resize',()=>{ needsRender=true; stillUntil=performance.now()+600; applyFov(); renderer.setSize(innerWidth,innerHeight,false);
     if(!cam.moving){ const v=viewFor(cam.view); cam.pos.copy(v.pos); cam.look.copy(v.look); } });
   document.addEventListener('visibilitychange',()=>{ if(document.hidden && drag){ endDrag(); } });
 

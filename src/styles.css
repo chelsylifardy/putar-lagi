@@ -106,7 +106,6 @@ html,body{margin:0;height:100%;background:#241a12;overflow:hidden;color:var(--cr
   border:1px solid var(--line);background:var(--glass);z-index:5;font:500 12px Inter,sans-serif;text-align:center}
 #handBox[hidden]{display:none}
 #handBox video{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;transform:scaleX(-1)}
-#handBox span{display:block;padding:5px 6px}
 /* hand cursors: hollow when open, small dot when pinching, solid disc when making a fist */
 .handCursor{position:fixed;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;z-index:30;pointer-events:none;
   border:3px solid var(--hc);box-shadow:0 0 0 2px rgba(43,35,32,.5),0 4px 14px rgba(0,0,0,.4);transition:width .12s,height .12s,margin .12s,background .12s}

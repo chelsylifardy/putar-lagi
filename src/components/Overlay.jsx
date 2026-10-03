@@ -108,3 +108,13 @@ export function GiftBox() {
     </div>
   );
 }
+
+export function HandControl() {
+  return (
+    <>
+      <div id="tools"><button className="chip" id="btnHands" aria-pressed="false">✋ Kontrol tangan</button></div>
+      <div id="handBox" hidden><video id="handCam" playsInline muted></video><span>Jepit jari untuk menekan</span></div>
+      <div id="handCursor" hidden aria-hidden="true"></div>
+    </>
+  );
+}

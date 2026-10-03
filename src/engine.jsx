@@ -420,7 +420,7 @@ export async function startEngine() {
   const casebox = buildCase(); casebox.position.set(22,0,-9); casebox.rotation.y=-.42; scene.add(casebox);
 
   /* gift box: only shown when the page was opened from a share link */
-  const GIFT = { W:13, D:9, H:4.6 };
+  const GIFT = { W:12, D:8.4, H:4.6 };
   function buildGift(){
     const g=new THREE.Group(), { W, D, H }=GIFT, t=.22;
     const [c,gg]=makeCanvas(256,256); gg.fillStyle='#c79a5e'; gg.fillRect(0,0,256,256);
@@ -452,7 +452,7 @@ export async function startEngine() {
     return { group:g, base, lid, mats, shadow };
   }
   const gift = buildGift(); gift.group.visible=false; scene.add(gift.group);
-  const GIFT_POS = V(6,0,3);
+  const GIFT_POS = V(6.3,0,6.4);
 
   function notebookCanvas(){
     const [c,g]=makeCanvas(1024,1448); g.fillStyle='#f1eadb'; g.fillRect(0,0,1024,1448); speckle(g,1024,1448,4000,'120,100,70',.06,2);
@@ -629,7 +629,7 @@ export async function startEngine() {
     closeup: { pos:[7.5,27,27], look:[7.2,0,7.5], k:.6 },
     rewind:  { pos:[7.5,26,17], look:[7.2,0,4.6], k:.5 },
     finished:{ pos:[1,35,38],   look:[1,0,2],    k:.75 },
-    gift:    { pos:[6,24,30],   look:[6,2.5,3],  k:.6 },
+    gift:    { pos:[4,30,36],   look:[4,1.5,4],  k:.7 },
   };
   const cam = { pos:V(), look:V(), view:'intro', moving:false };
   const fovFor = () => { const a=innerWidth/innerHeight; return a<.8 ? 52 : a<1.2 ? 42 : 34; };
@@ -745,6 +745,7 @@ export async function startEngine() {
     else if(st==='rewinding'){ setInstr('Putar pensilnya. Gulung kembali.'); setControls([{label:'Tahan untuk menggulung',hold:true}]); }
     else if(st==='restored'){ setInstr('Sudah rapi. Putar lagi?'); setControls([{label:'▶ Dengarkan lagi',primary:true,onClick:()=>replay(true)},{label:'✉ Kirim ke teman',onClick:openShare},{label:'⤓ Simpan rekaman',onClick:download}]); }
     else if(st==='gift'){ setInstr(''); setControls([]); }
+    else if(st==='giftOpen'){ setInstr('Ambil kasetnya, masukkan ke recorder.'); setControls([]); hs=()=>cassette.position.clone().setY(1.4); }
     else setControls([]);
     S.hot=hs; ui.hot.hidden=!hs;
   }
@@ -1016,19 +1017,44 @@ export async function startEngine() {
     g.rotation.set(0,0,0); g.position.y=0;
     sfx('click');
     // lid pops up, tumbles and lands beside the box
-    const l0=lid.position.clone(), up=V(2.5,H+6,-1), land=V(11.5,1.2-g.position.y,3.5);
+    const l0=lid.position.clone(), up=V(2.5,H+6,-1), land=V(11,1.2,9);
     await tween(.45*M,k=>{ lid.position.lerpVectors(l0,up,k); lid.rotation.set(-.35*k,0,.25*k); },easeOut);
     await tween(.6*M,k=>{ lid.position.lerpVectors(up,land,k); lid.position.y=lerp(up.y,land.y,easeIn(k)); lid.rotation.set(lerp(-.35,0,k),.5*k,lerp(.25,0,k)); },t=>t);
     lid.position.copy(land); sfx('clunk');
-    // cassette rises out of the box and hovers for a beat
-    const c0=cassette.position.clone(), c1=c0.clone().setY(H+4.5);
-    await tween(.9*M,k=>{ cassette.position.lerpVectors(c0,c1,k); cassette.rotation.y=Math.sin(k*Math.PI)*.35; cassette.rotation.x=-.25*k; },easeOut);
-    await tween(.5*M,k=>{ cassette.position.y=c1.y+Math.sin(k*Math.PI)*.4; cassette.rotation.x=lerp(-.25,0,k); });
-    // box fades away while the tape drops into the recorder
-    const fade=tween(1.2*M,k=>{ gift.mats.forEach(m=>m.opacity=1-k); gift.shadow.material.opacity=.5*(1-k); });
-    tapeReset(); await insertCassette(); await fade;
-    gift.group.visible=false;
-    S.busy=false; S.hasPlayed=false; S.state='recorded'; renderUI(); S.forceRestart=true; play();
+    // the cassette peeks up a little, waiting to be picked up
+    const c0=cassette.position.clone();
+    await tween(.5*M,k=>{ cassette.position.y=c0.y+Math.sin(k*Math.PI)*1.2; });
+    S.busy=false; setState('giftOpen');
+  }
+  const HOLD_Y=6;
+  function grabCassette(id){
+    drag={ type:'cassette', id }; capture(id); canvas.style.cursor='grabbing'; ui.hot.hidden=true; sfx('click');
+    const from=cassette.position.clone();
+    tween(.25*M,k=>{ cassette.position.y=lerp(from.y,HOLD_Y,k); cassette.rotation.x=-.18*k; },easeOut);
+  }
+  function moveCassette(){
+    const w=planeHit(HOLD_Y); if(!w) return;
+    w.x=clamp(w.x,-20,24); w.z=clamp(w.z,-12,18);
+    cassette.position.x=lerp(cassette.position.x,w.x,.5); cassette.position.z=lerp(cassette.position.z,w.z,.5);
+    const d=Math.hypot(w.x-SLOT.x,w.z-SLOT.z); cassette.rotation.z=(d<9||ray.intersectObject(recorder,true).length)?Math.sin(performance.now()/90)*.03:0;
+  }
+  async function dropCassette(){
+    cassette.rotation.z=0;
+    const p=cassette.position, d=Math.hypot(p.x-SLOT.x,p.z-SLOT.z);
+    // over the recorder on screen, or close enough to the slot in the world
+    if(d<9 || ray.intersectObject(recorder,true).length){
+      S.busy=true; S.state='inserting'; renderUI();
+      const fade=tween(1.2*M,k=>{ gift.mats.forEach(m=>m.opacity=1-k); gift.shadow.material.opacity=.5*(1-k); });
+      tapeReset(); await insertCassette(); await fade;
+      gift.group.visible=false;
+      S.busy=false; S.hasPlayed=false; S.state='recorded'; renderUI(); S.forceRestart=true; play();
+      return;
+    }
+    // missed the recorder: it settles back into the box
+    S.busy=true; hint('Bawa ke recorder ya.');
+    const from=p.clone(), to=GIFT_POS.clone().setY(.3);
+    await tween(.6*M,k=>{ cassette.position.lerpVectors(from,to,k); cassette.position.y=lerp(from.y,to.y,easeIn(k)); cassette.rotation.x=lerp(-.18,0,k); });
+    sfx('click'); S.busy=false; renderUI();
   }
 
   async function insertPencil(){
@@ -1087,6 +1113,7 @@ export async function startEngine() {
     if(drag || S.busy || !$('#modal').hidden) return;
     ensureCtx(); setRay(e); const st=S.state;
     if(st==='gift'){ if(ray.intersectObject(gift.group,true).length) openGift(); return; }
+    if(st==='giftOpen'){ if(ray.intersectObject(cassette,true).length || ray.intersectObject(gift.base,true).length) grabCassette(e.pointerId); return; }
     if(st==='tangled' && hitPencil()){
       drag={ type:'pencil', id:e.pointerId }; capture(e.pointerId); canvas.style.cursor='grabbing'; ui.hot.hidden=true; sfx('click'); return;
     }
@@ -1108,7 +1135,8 @@ export async function startEngine() {
     if(drag && e.pointerId!==drag.id) return;
     setRay(e);
     if(!drag){ hover(e); return; }
-    if(drag.type==='tape'){
+    if(drag.type==='cassette'){ moveCassette(); }
+    else if(drag.type==='tape'){
       const t=tapeTargetFromRay(); if(t) tape.raw.copy(t);
       const now=performance.now(), dt=Math.max(1,now-pv.t), vx=(e.clientX-pv.x)/dt, vy=(e.clientY-pv.y)/dt;
       const sp=Math.hypot(vx,vy), sp0=Math.hypot(pv.vx,pv.vy);
@@ -1133,6 +1161,7 @@ export async function startEngine() {
     if(!drag || (e && e.pointerId!==drag.id)) return;
     const d=drag; drag=null; canvas.style.cursor='';
     try{ canvas.releasePointerCapture(d.id); }catch{}
+    if(d.type==='cassette'){ dropCassette(); return; }
     if(d.type==='tape'){ tape.grab=-1; if(S.state==='pulling' && outLen()<.3 && !S.tangled) { /* barely pulled */ } }
     if(d.type==='pencil' && S.state==='tangled'){ S.busy=true; const t0=pencilPose.tip.clone();
       tween(.5*M,k=>{ pencilPose.tip.lerpVectors(t0,PENCIL_REST.tip,k); pencilPose.tip.y+=Math.sin(k*Math.PI)*.8; applyPencil(); }).then(()=>{ S.busy=false; renderUI(); }); }
@@ -1146,6 +1175,7 @@ export async function startEngine() {
     let label=null, cur='';
     const st=S.state;
     if(st==='gift' && ray.intersectObject(gift.group,true).length){ label='Buka kotak'; cur='pointer'; }
+    else if(st==='giftOpen' && ray.intersectObject(cassette,true).length){ label='Ambil kaset'; cur='grab'; }
     else if(st==='rewinding'){ label='Putar melingkar searah jarum jam'; cur='grab'; }
     else if(st==='tangled' && hitPencil()){ label='Seret pensil ke lubang kaset'; cur='grab'; }
     else if((st==='ejected'||st==='pulling'||st==='tangled') && pickTape(e)>0){ label='Tarik pita'; cur='grab'; }

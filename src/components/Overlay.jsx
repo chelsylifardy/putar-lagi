@@ -112,8 +112,7 @@ export function GiftBox() {
 export function HandControl() {
   return (
     <>
-      <div id="tools"><button className="chip" id="btnHands" aria-pressed="false">✋ Kontrol tangan</button></div>
-      <div id="handBox" hidden><video id="handCam" playsInline muted></video><span>Jepit jari untuk menekan</span></div>
+      <div id="handBox" hidden><video id="handCam" playsInline muted></video><span id="handHint">Jepit telunjuk + jempol untuk menekan</span></div>
       <div id="handCursor" hidden aria-hidden="true"></div>
     </>
   );

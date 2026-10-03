@@ -745,7 +745,7 @@ export async function startEngine() {
     else if(st==='rewinding'){ setInstr('Putar pensilnya. Gulung kembali.'); setControls([{label:'Tahan untuk menggulung',hold:true}]); }
     else if(st==='restored'){ setInstr('Sudah rapi. Putar lagi?'); setControls([{label:'▶ Dengarkan lagi',primary:true,onClick:()=>replay(true)},{label:'✉ Kirim ke teman',onClick:openShare},{label:'⤓ Simpan rekaman',onClick:download}]); }
     else if(st==='gift'){ setInstr(''); setControls([]); }
-    else if(st==='giftOpen'){ setInstr('Ambil kasetnya, masukkan ke recorder.'); setControls([]); hs=()=>cassette.position.clone().setY(1.4); }
+    else if(st==='giftOpen'){ setInstr('Jepit kasetnya untuk mengambil, lalu bawa ke recorder.'); setControls([]); hs=()=>cassette.position.clone().setY(1.4); }
     else setControls([]);
     S.hot=hs; ui.hot.hidden=!hs;
   }
@@ -1029,6 +1029,7 @@ export async function startEngine() {
   const HOLD_Y=6;
   function grabCassette(id){
     drag={ type:'cassette', id }; capture(id); canvas.style.cursor='grabbing'; ui.hot.hidden=true; sfx('click');
+    setInstr('Bawa ke atas recorder, lalu lepaskan.');
     const from=cassette.position.clone();
     tween(.25*M,k=>{ cassette.position.y=lerp(from.y,HOLD_Y,k); cassette.rotation.x=-.18*k; },easeOut);
   }
@@ -1175,7 +1176,7 @@ export async function startEngine() {
     let label=null, cur='';
     const st=S.state;
     if(st==='gift' && ray.intersectObject(gift.group,true).length){ label='Buka kotak'; cur='pointer'; }
-    else if(st==='giftOpen' && ray.intersectObject(cassette,true).length){ label='Ambil kaset'; cur='grab'; }
+    else if(st==='giftOpen' && (ray.intersectObject(cassette,true).length || ray.intersectObject(gift.base,true).length)){ label='Jepit untuk ambil kaset'; cur='grab'; }
     else if(st==='rewinding'){ label='Putar melingkar searah jarum jam'; cur='grab'; }
     else if(st==='tangled' && hitPencil()){ label='Seret pensil ke lubang kaset'; cur='grab'; }
     else if((st==='ejected'||st==='pulling'||st==='tangled') && pickTape(e)>0){ label='Tarik pita'; cur='grab'; }

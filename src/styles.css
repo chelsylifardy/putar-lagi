@@ -88,3 +88,19 @@ html,body{margin:0;height:100%;background:#241a12;overflow:hidden;color:var(--cr
   #status.rec .dot{animation:none}
 }
 #root{display:contents}
+.card textarea{width:100%;font:700 24px/1.15 Caveat,cursive;color:#23346a;background:transparent;border:0;border-bottom:2px solid rgba(52,70,107,.5);
+  padding:4px 2px;margin:0 0 16px;outline:none;resize:none}
+.card input.link{font:500 13px "IBM Plex Mono",monospace;text-overflow:ellipsis}
+.card.gift{text-align:center}
+.card.gift .row{justify-content:center}
+.gift .from{font-family:Caveat,cursive;font-size:24px;margin:-4px 0 10px;color:#5b4d44}
+.gift .msg{font-family:Caveat,cursive;font-size:26px;line-height:1.15;color:#23346a}
+.box{position:relative;width:120px;height:96px;margin:4px auto 14px}
+.box .base{position:absolute;left:8px;right:8px;bottom:0;height:66px;border-radius:4px;
+  background:linear-gradient(90deg,transparent 44%,#a8483e 44% 56%,transparent 56%),#c98a3a;box-shadow:inset 0 -6px rgba(0,0,0,.12)}
+.box .lid{position:absolute;left:0;right:0;top:12px;height:22px;border-radius:4px;z-index:1;
+  background:linear-gradient(90deg,transparent 44%,#a8483e 44% 56%,transparent 56%),#d79b4b;transition:transform .7s cubic-bezier(.3,1.4,.5,1)}
+.box .lid::before{content:"";position:absolute;left:50%;top:-14px;width:34px;height:18px;margin-left:-17px;border:5px solid #a8483e;border-radius:50% 50% 0 0}
+#gift.opening .lid{transform:translateY(-46px) rotate(-14deg)}
+#gift.opening .card{transition:opacity .4s .5s;opacity:0}
+@media (prefers-reduced-motion:reduce){ .box .lid{transition:none} }

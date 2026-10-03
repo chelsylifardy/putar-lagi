@@ -72,3 +72,48 @@ export function TitleEditor() {
     </div>
   );
 }
+
+export function ShareBox() {
+  return (
+    <div id="shareBox" className="overlay" hidden>
+      <div className="card" role="dialog" aria-modal="true" aria-labelledby="shareTtl">
+        <h2 id="shareTtl">Kirim ke teman</h2>
+        <form id="shareForm">
+          <label htmlFor="shareFrom">Dari</label>
+          <input id="shareFrom" maxLength={24} autoComplete="off" placeholder="namamu" />
+          <label htmlFor="shareTo">Untuk</label>
+          <input id="shareTo" maxLength={24} autoComplete="off" placeholder="nama temanmu" />
+          <label htmlFor="shareMsg">Pesan singkat (maks. 140 huruf)</label>
+          <textarea id="shareMsg" maxLength={140} rows={2} placeholder="mis. Dengarkan pelan-pelan ya"></textarea>
+          <div className="row">
+            <button type="button" className="btn" id="shareCancel">Batal</button>
+            <button className="btn primary">Bungkus kaset</button>
+          </div>
+        </form>
+        <div id="shareDone" hidden>
+          <p id="shareSize"></p>
+          <input id="shareLink" className="link" readOnly aria-label="Tautan kaset" />
+          <div className="row">
+            <button type="button" className="btn" id="shareClose">Tutup</button>
+            <button type="button" className="btn" id="shareNative" hidden>Bagikan…</button>
+            <button type="button" className="btn primary" id="shareCopy">Salin tautan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function GiftBox() {
+  return (
+    <div id="gift" className="overlay" hidden>
+      <div className="card gift" role="dialog" aria-modal="true" aria-labelledby="giftTitle">
+        <div className="box" aria-hidden="true"><span className="lid"></span><span className="base"></span></div>
+        <h2 id="giftTitle">Ada kaset untukmu</h2>
+        <p id="giftFrom" className="from"></p>
+        <p id="giftMsg" className="msg"></p>
+        <div className="row"><button type="button" className="btn primary" id="giftOpen">Buka kotak</button></div>
+      </div>
+    </div>
+  );
+}

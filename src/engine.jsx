@@ -34,6 +34,7 @@ export async function startEngine() {
   // dense (2x+) screens are sharp without MSAA, which is costly on phones
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:devicePixelRatio<2, powerPreference:'high-performance' });
   let pixelRatio = Math.min(devicePixelRatio, 2);
+  const STILL_RATIO = Math.min(devicePixelRatio, 3);
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(innerWidth, innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -639,6 +640,7 @@ export async function startEngine() {
     const v=VIEWS[name], look=V(...v.look), pos=V(...v.pos), aspect=innerWidth/innerHeight;
     const fovK=Math.tan(THREE.MathUtils.degToRad(17))/Math.tan(THREE.MathUtils.degToRad(fovFor()/2));
     let k=aspect<1.45 ? clamp(Math.pow(1.45/aspect, v.k)*fovK,.9,2.6) : 1;
+    if(aspect<.8) k*=.86;
     pos.sub(look); if(aspect<.8){ pos.y*=1.3; pos.z*=.72; } pos.multiplyScalar(k).add(look);
     if(aspect<.8 && name==='intro'){ look.x+=1; pos.x+=1; }
     return { pos, look };
@@ -1211,7 +1213,7 @@ export async function startEngine() {
   }
 
   /* ───────────────────────── frame loop ───────────────────────── */
-  let angA=0, angB=0, last=performance.now(), fpsAcc=0, fpsN=0, quality=2, meterLvl=0, stillUntil=0, needsRender=true;
+  let angA=0, angB=0, last=performance.now(), fpsAcc=0, fpsN=0, quality=2, meterLvl=0, stillUntil=0, needsRender=true, sharp=false;
   const H_STEP=1/60;
   /* ───────────────────────── two-hand control ───────────────────────── */
   const handMode = () => getHands().length>0;
@@ -1337,14 +1339,20 @@ export async function startEngine() {
     const moving = tweens.length || drag || cam.moving || tape.active || dust || !lowPower || awaitLid || lidHands.size ||
       ['recording','playing','pulling','rewinding','settling','ejecting','inserting','gift'].includes(S.state) || S.busy;
     if(moving) stillUntil=now+600;
-    if(now<stillUntil || needsRender){ needsRender=false; renderer.render(scene,camera); }
+    if(now<stillUntil || needsRender){
+      if(renderer.getPixelRatio()!==pixelRatio){ renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth,innerHeight,false); }
+      needsRender=false; sharp=false; renderer.render(scene,camera);
+    } else if(lowPower && !sharp){
+      // once things settle, draw one frame at the screen's full sharpness
+      sharp=true; renderer.setPixelRatio(STILL_RATIO); renderer.setSize(innerWidth,innerHeight,false); renderer.render(scene,camera);
+    }
 
     // adaptive quality
     // adaptive quality: step down while frames stay slow (each step is cheap to apply)
     if(quality>0 && now>2500){ fpsAcc+=dt; fpsN++; if(fpsN>=90){ if(fpsAcc/fpsN>1/40){
         quality--;
         if(quality===1){ sun.shadow.mapSize.set(512,512); sun.shadow.map?.dispose(); sun.shadow.map=null; tape.iter=8; }
-        else { pixelRatio=Math.min(pixelRatio,1.5); renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth,innerHeight,false); if(dust) dust.visible=false; tape.iter=7; }
+        else { if(!lowPower){ pixelRatio=Math.min(pixelRatio,1.5); renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth,innerHeight,false); } if(dust) dust.visible=false; tape.iter=7; }
       } fpsAcc=0; fpsN=0; } }
     requestAnimationFrame(frame);
   }

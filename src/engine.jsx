@@ -831,7 +831,7 @@ export async function startEngine() {
       mr.onstop=finishRecording;
       mr.onerror=()=>{ toast('Perekaman terhenti karena galat.'); };
       if(ensureCtx()){ micSrc=actx.createMediaStreamSource(stream); micAnalyser=actx.createAnalyser(); micAnalyser.fftSize=512; micSrc.connect(micAnalyser); }
-      setKey('rec',true); setKey('play',true); sfx('clunk');
+      setKey('rec',true); sfx('clunk');
       mr.start(250); recState.start=performance.now(); recState.elapsed=0;
       S.hasPlayed=false; S.state='recording'; renderUI();
     }catch(err){

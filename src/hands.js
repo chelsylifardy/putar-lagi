@@ -93,7 +93,15 @@ function track() {
 
 export async function startHands() {
   if (running) return;
-  stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
+  const video_ = { width: 640, height: 480, facingMode: 'user' };
+  // ask for the microphone in the same native prompt, so pressing REC later starts right away
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: video_, audio: true });
+    stream.getAudioTracks().forEach(t => { t.stop(); stream.removeTrack(t); });
+  } catch (err) {
+    if (err?.name === 'NotFoundError' || err?.name === 'NotAllowedError') stream = await navigator.mediaDevices.getUserMedia({ video: video_ });
+    else throw err;
+  }
   const video = $('#handCam');
   video.srcObject = stream; await video.play();
   if (!landmarker) {

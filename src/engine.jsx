@@ -822,10 +822,13 @@ export async function startEngine() {
   async function startRecording(){
     if(!window.isSecureContext){ micError('insecure'); return; }
     if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder){ micError('unsupported'); return; }
-    S.busy=true; setInstr('Meminta izin mikrofon…');
+    S.busy=true;
     let stream;
     try{ stream=await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } }); }
-    catch(err){ S.busy=false; micError(err && err.name); return; }
+    catch(err){
+      try{ stream=await navigator.mediaDevices.getUserMedia({ audio:true }); }
+      catch{ S.busy=false; micError(err && err.name); return; }
+    }
     try{
       if(!S.inRecorder){ await insertCassette(); } else { await goView('recorder',1.1); if(rec3d.lid.rotation.x<-.05) await moveLid(false); }
       // reset tape visuals to a fresh cassette side
